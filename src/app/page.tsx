@@ -22,6 +22,8 @@ function exchangeTradeUrl(exchange: string, symbol: string): string | null {
       return `https://pro.edgex.exchange/trade/${symbol}USD`
     case 'Lighter':
       return `https://app.lighter.xyz/trade/${symbol}`
+    case 'Backpack':
+      return `https://backpack.exchange/trade/${symbol}_USD_PERP`
     case 'ParaDex':
       return `https://app.paradex.trade/trade/${symbol}-USD-PERP`
     default:
