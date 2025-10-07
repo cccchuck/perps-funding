@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getDefaultAdapters } from '../lib/adapters'
 import type { AdapterStatus, FundingDatum } from '../lib/adapters/types'
 
@@ -32,14 +32,12 @@ function exchangeTradeUrl(exchange: string, symbol: string): string | null {
 export default function Home() {
   const [lastUpdate, setLastUpdate] = useState<number | null>(null)
   const [intervalSec, setIntervalSec] = useState<number>(30)
-  const [loading, setLoading] = useState<boolean>(false)
   const [statuses, setStatuses] = useState<Record<string, AdapterStatus>>({})
   const [data, setData] = useState<FundingDatum[]>([])
   const controlsRef = useRef<{
     [id: string]: {
       stop: () => void
       setIntervalSec?: (s: number) => void
-      manualRefresh?: () => Promise<void>
     }
   }>({})
   const dataByAdapterRef = useRef<Record<string, FundingDatum[]>>({})
@@ -72,22 +70,6 @@ export default function Home() {
       Object.values(controlsRef.current).forEach((c) => c.stop())
       controlsRef.current = {}
       dataByAdapterRef.current = {}
-    }
-  }, [])
-
-  // Manual refresh across all pull adapters
-  const manualRefreshAll = useCallback(async () => {
-    try {
-      setLoading(true)
-      const ctrls = Object.values(controlsRef.current)
-      await Promise.all(
-        ctrls
-          .map((c) => c.manualRefresh)
-          .filter(Boolean)
-          .map((fn) => (fn as () => Promise<void>)())
-      )
-    } finally {
-      setLoading(false)
     }
   }, [])
 
@@ -161,14 +143,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="mb-3 flex items-center gap-3 text-sm">
-        <button
-          className="rounded-md border px-3 py-1 hover:bg-black/5 dark:hover:bg-white/10"
-          onClick={() => manualRefreshAll()}
-          disabled={loading}
-        >
-          {loading ? '刷新中...' : '手动刷新'}
-        </button>
+      <div className="mb-3 flex items-center text-sm">
         <label className="flex items-center gap-2">
           自动刷新:
           <select
