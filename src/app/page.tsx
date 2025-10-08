@@ -1,189 +1,191 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getDefaultAdapters } from '../lib/adapters'
-import type { AdapterStatus, FundingDatum } from '../lib/adapters/types'
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getDefaultAdapters } from "../lib/adapters";
+import type { AdapterStatus, FundingDatum } from "../lib/adapters/types";
 
 function msToPeriod(ms?: number | null): string {
-  if (!ms || ms <= 0) return '-'
-  const minutes = Math.round(ms / 60000)
-  if (minutes % 60 === 0) return `${minutes / 60}h`
-  return `${minutes}m`
+  if (!ms || ms <= 0) return "-";
+  const minutes = Math.round(ms / 60000);
+  if (minutes % 60 === 0) return `${minutes / 60}h`;
+  return `${minutes}m`;
 }
 
 function fmtPct(x: number, dp = 4): string {
-  if (!isFinite(x)) return '-'
-  return `${(x * 100).toFixed(dp)}%`
+  if (!isFinite(x)) return "-";
+  return `${(x * 100).toFixed(dp)}%`;
 }
 
 function exchangeTradeUrl(exchange: string, symbol: string): string | null {
   switch (exchange) {
-    case 'EdgeX':
-      return `https://pro.edgex.exchange/trade/${symbol}USD`
-    case 'Lighter':
-      return `https://app.lighter.xyz/trade/${symbol}`
-    case 'Backpack':
-      return `https://backpack.exchange/trade/${symbol}_USD_PERP`
-    case 'ParaDex':
-      return `https://app.paradex.trade/trade/${symbol}-USD-PERP`
+    case "EdgeX":
+      return `https://pro.edgex.exchange/trade/${symbol}USD`;
+    case "Lighter":
+      return `https://app.lighter.xyz/trade/${symbol}`;
+    case "Backpack":
+      return `https://backpack.exchange/trade/${symbol}_USD_PERP`;
+    case "ParaDex":
+      return `https://app.paradex.trade/trade/${symbol}-USD-PERP`;
     default:
-      return null
+      return null;
   }
 }
 
-const MIN_ENABLED_ADAPTERS = 2
+const MIN_ENABLED_ADAPTERS = 2;
 
 export default function Home() {
-  const adapters = useMemo(() => getDefaultAdapters(), [])
-  const adapterIds = useMemo(() => adapters.map((adp) => adp.id), [adapters])
+  const adapters = useMemo(() => getDefaultAdapters(), []);
+  const adapterIds = useMemo(() => adapters.map((adp) => adp.id), [adapters]);
 
-  const [enabledIds, setEnabledIds] = useState<string[]>(() => adapterIds)
-  const [lastUpdate, setLastUpdate] = useState<number | null>(null)
-  const [intervalSec, setIntervalSec] = useState<number>(30)
-  const [statuses, setStatuses] = useState<Record<string, AdapterStatus>>({})
-  const [data, setData] = useState<FundingDatum[]>([])
+  const [enabledIds, setEnabledIds] = useState<string[]>(() => adapterIds);
+  const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [intervalSec, setIntervalSec] = useState<number>(30);
+  const [statuses, setStatuses] = useState<Record<string, AdapterStatus>>({});
+  const [data, setData] = useState<FundingDatum[]>([]);
 
-  const enabledSetRef = useRef<Set<string>>(new Set(adapterIds))
+  const enabledSetRef = useRef<Set<string>>(new Set(adapterIds));
   const controlsRef = useRef<{
     [id: string]: {
-      stop: () => void
-      setIntervalSec?: (s: number) => void
-    }
-  }>({})
-  const dataByAdapterRef = useRef<Record<string, FundingDatum[]>>({})
+      stop: () => void;
+      setIntervalSec?: (s: number) => void;
+    };
+  }>({});
+  const dataByAdapterRef = useRef<Record<string, FundingDatum[]>>({});
 
   useEffect(() => {
-    enabledSetRef.current = new Set(enabledIds)
-  }, [enabledIds])
+    enabledSetRef.current = new Set(enabledIds);
+  }, [enabledIds]);
 
   const onData = useCallback(
     (list: FundingDatum[], adapterId: string) => {
-      if (!enabledSetRef.current.has(adapterId)) return
+      if (!enabledSetRef.current.has(adapterId)) return;
       dataByAdapterRef.current = {
         ...dataByAdapterRef.current,
         [adapterId]: list,
-      }
-      const merged = Object.values(dataByAdapterRef.current).flat()
-      setData(merged)
-      setLastUpdate(Date.now())
+      };
+      const merged = Object.values(dataByAdapterRef.current).flat();
+      setData(merged);
+      setLastUpdate(Date.now());
     },
-    [setData, setLastUpdate]
-  )
+    [setData, setLastUpdate],
+  );
 
   const onStatus = useCallback(
     (st: AdapterStatus, adapterId: string) => {
-      if (!enabledSetRef.current.has(adapterId)) return
-      setStatuses((prev) => ({ ...prev, [adapterId]: st }))
+      if (!enabledSetRef.current.has(adapterId)) return;
+      setStatuses((prev) => ({ ...prev, [adapterId]: st }));
     },
-    [setStatuses]
-  )
+    [setStatuses],
+  );
 
   useEffect(() => {
-    const enabledSet = new Set(enabledIds)
-    const controls = controlsRef.current
-    const removed: string[] = []
+    const enabledSet = new Set(enabledIds);
+    const controls = controlsRef.current;
+    const removed: string[] = [];
 
     adapters.forEach((adp) => {
-      const isEnabled = enabledSet.has(adp.id)
-      const hasControl = controls[adp.id] != null
+      const isEnabled = enabledSet.has(adp.id);
+      const hasControl = controls[adp.id] != null;
 
       if (isEnabled && !hasControl) {
-        const ctl = adp.start({ onData, onStatus, intervalSec })
-        controls[adp.id] = ctl
+        const ctl = adp.start({ onData, onStatus, intervalSec });
+        controls[adp.id] = ctl;
       } else if (!isEnabled && hasControl) {
-        controls[adp.id].stop()
-        delete controls[adp.id]
-        delete dataByAdapterRef.current[adp.id]
-        removed.push(adp.id)
+        controls[adp.id].stop();
+        delete controls[adp.id];
+        delete dataByAdapterRef.current[adp.id];
+        removed.push(adp.id);
       }
-    })
+    });
 
     if (removed.length > 0) {
-      setData(Object.values(dataByAdapterRef.current).flat())
+      setData(Object.values(dataByAdapterRef.current).flat());
       setStatuses((prev) => {
-        const next = { ...prev }
+        const next = { ...prev };
         removed.forEach((id) => {
-          delete next[id]
-        })
-        return next
-      })
-      setLastUpdate(Date.now())
+          delete next[id];
+        });
+        return next;
+      });
+      setLastUpdate(Date.now());
     }
-  }, [adapters, enabledIds, intervalSec, onData, onStatus])
+  }, [adapters, enabledIds, intervalSec, onData, onStatus]);
 
   useEffect(() => {
     return () => {
-      Object.values(controlsRef.current).forEach((c) => c.stop())
-      controlsRef.current = {}
-      dataByAdapterRef.current = {}
-    }
-  }, [])
+      Object.values(controlsRef.current).forEach((c) => c.stop());
+      controlsRef.current = {};
+      dataByAdapterRef.current = {};
+    };
+  }, []);
 
   const handleToggleAdapter = useCallback((id: string) => {
     setEnabledIds((prev) => {
       if (prev.includes(id)) {
-        if (prev.length <= MIN_ENABLED_ADAPTERS) return prev
-        return prev.filter((item) => item !== id)
+        if (prev.length <= MIN_ENABLED_ADAPTERS) return prev;
+        return prev.filter((item) => item !== id);
       }
-      return [...prev, id]
-    })
-  }, [])
+      return [...prev, id];
+    });
+  }, []);
 
   // Propagate interval change to supported adapters
   useEffect(() => {
-    const ctrls = Object.values(controlsRef.current)
-    ctrls.forEach((c) => c.setIntervalSec?.(intervalSec))
-  }, [intervalSec])
+    const ctrls = Object.values(controlsRef.current);
+    ctrls.forEach((c) => c.setIntervalSec?.(intervalSec));
+  }, [intervalSec]);
 
   const rows = useMemo(() => {
     type Row = {
-      symbol: string
-      longEx: string
-      longRate1h: number
-      longPeriod: string
-      shortEx: string
-      shortRate1h: number
-      shortPeriod: string
-      diff1h: number
-    }
-    const out: Row[] = []
-    const bySymbol: Record<string, FundingDatum[]> = {}
+      symbol: string;
+      longEx: string;
+      longRate1h: number;
+      longPeriod: string;
+      shortEx: string;
+      shortRate1h: number;
+      shortPeriod: string;
+      diff1h: number;
+    };
+    const out: Row[] = [];
+    const bySymbol: Record<string, FundingDatum[]> = {};
     for (const d of data) {
-      if (!bySymbol[d.symbol]) bySymbol[d.symbol] = []
-      bySymbol[d.symbol].push(d)
+      if (!bySymbol[d.symbol]) bySymbol[d.symbol] = [];
+      bySymbol[d.symbol].push(d);
     }
     for (const [sym, list] of Object.entries(bySymbol)) {
       // Deduplicate by exchange per symbol (keep last)
-      const byEx: Record<string, FundingDatum> = {}
-      for (const d of list) byEx[d.exchange] = d
-      const uniq = Object.values(byEx)
-      if (uniq.length < 2) continue
-      let best: Row | null = null
+      const byEx: Record<string, FundingDatum> = {};
+      for (const d of list) byEx[d.exchange] = d;
+      const uniq = Object.values(byEx);
+      if (uniq.length < 2) continue;
+      // Generate all possible exchange combinations for this symbol
       for (let i = 0; i < uniq.length; i++) {
         for (let j = 0; j < uniq.length; j++) {
-          if (i === j) continue
-          const a = uniq[i]
-          const b = uniq[j]
-          if (a.exchange === b.exchange) continue
-          const diff = b.ratePerHour - a.ratePerHour // short - long
-          const row: Row = {
-            symbol: sym,
-            longEx: a.exchange,
-            longRate1h: a.ratePerHour,
-            longPeriod: msToPeriod(a.periodMs),
-            shortEx: b.exchange,
-            shortRate1h: b.ratePerHour,
-            shortPeriod: msToPeriod(b.periodMs),
-            diff1h: diff,
+          if (i === j) continue;
+          const a = uniq[i];
+          const b = uniq[j];
+          if (a.exchange === b.exchange) continue;
+          const diff = b.ratePerHour - a.ratePerHour; // short - long
+          // Only include combinations with positive funding rate difference (profitable)
+          if (diff > 0) {
+            const row: Row = {
+              symbol: sym,
+              longEx: a.exchange,
+              longRate1h: a.ratePerHour,
+              longPeriod: msToPeriod(a.periodMs),
+              shortEx: b.exchange,
+              shortRate1h: b.ratePerHour,
+              shortPeriod: msToPeriod(b.periodMs),
+              diff1h: diff,
+            };
+            out.push(row);
           }
-          if (!best || row.diff1h > best.diff1h) best = row
         }
       }
-      if (best) out.push(best)
     }
-    out.sort((a, b) => b.diff1h - a.diff1h)
-    return out
-  }, [data])
+    out.sort((a, b) => b.diff1h - a.diff1h);
+    return out;
+  }, [data]);
 
   return (
     <>
@@ -215,16 +217,16 @@ export default function Home() {
             </div>
             <div className="flex flex-wrap justify-center gap-3 sm:justify-end">
               {adapters.map((adapter) => {
-                const checked = enabledIds.includes(adapter.id)
+                const checked = enabledIds.includes(adapter.id);
                 const disableToggle =
-                  checked && enabledIds.length <= MIN_ENABLED_ADAPTERS
+                  checked && enabledIds.length <= MIN_ENABLED_ADAPTERS;
                 return (
                   <label
                     key={adapter.id}
                     className={`flex items-center gap-1 rounded-md border px-2 py-1 ${
                       disableToggle
-                        ? 'cursor-not-allowed opacity-60'
-                        : 'cursor-pointer hover:bg-black/5 dark:hover:bg-white/10'
+                        ? "cursor-not-allowed opacity-60"
+                        : "cursor-pointer hover:bg-black/5 dark:hover:bg-white/10"
                     }`}
                   >
                     <input
@@ -236,7 +238,7 @@ export default function Home() {
                     />
                     {adapter.label}
                   </label>
-                )
+                );
               })}
             </div>
           </div>
@@ -244,7 +246,7 @@ export default function Home() {
 
         <div
           className="border border-black/10 dark:border-white/10 rounded-md overflow-auto"
-          style={{ maxHeight: 'calc(100vh - 280px)' }}
+          style={{ maxHeight: "calc(100vh - 280px)" }}
         >
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 border-b border-black/10 bg-slate-100 text-left text-gray-900 dark:border-white/10 dark:bg-slate-800 dark:text-gray-100">
@@ -270,15 +272,15 @@ export default function Home() {
                   </td>
                 </tr>
               ) : (
-                rows.map((r) => (
+                rows.map((r, index) => (
                   <tr
-                    key={r.symbol}
+                    key={`${r.symbol}-${r.longEx}-${r.shortEx}-${index}`}
                     className="border-t border-black/5 dark:border-white/10"
                   >
                     <td className="px-3 py-2 font-medium">{r.symbol}</td>
                     <td className="px-3 py-2">
                       {(() => {
-                        const url = exchangeTradeUrl(r.longEx, r.symbol)
+                        const url = exchangeTradeUrl(r.longEx, r.symbol);
                         return url ? (
                           <a
                             className="underline underline-offset-4 hover:opacity-80"
@@ -290,14 +292,14 @@ export default function Home() {
                           </a>
                         ) : (
                           r.longEx
-                        )
+                        );
                       })()}
                     </td>
                     <td className="px-3 py-2">{fmtPct(r.longRate1h)}</td>
                     <td className="px-3 py-2">{r.longPeriod}</td>
                     <td className="px-3 py-2">
                       {(() => {
-                        const url = exchangeTradeUrl(r.shortEx, r.symbol)
+                        const url = exchangeTradeUrl(r.shortEx, r.symbol);
                         return url ? (
                           <a
                             className="underline underline-offset-4 hover:opacity-80"
@@ -309,14 +311,14 @@ export default function Home() {
                           </a>
                         ) : (
                           r.shortEx
-                        )
+                        );
                       })()}
                     </td>
                     <td className="px-3 py-2">{fmtPct(r.shortRate1h)}</td>
                     <td className="px-3 py-2">{r.shortPeriod}</td>
                     <td
                       className={`px-3 py-2 ${
-                        r.diff1h >= 0 ? 'text-green-600' : 'text-red-600'
+                        r.diff1h >= 0 ? "text-green-600" : "text-red-600"
                       }`}
                     >
                       {fmtPct(r.diff1h)}
@@ -332,7 +334,7 @@ export default function Home() {
           <div>
             {lastUpdate
               ? `最后更新：${new Date(lastUpdate).toLocaleTimeString()}`
-              : '等待更新...'}
+              : "等待更新..."}
           </div>
           <div>
             说明：资金费率按 1 小时折算后计算“做空-做多”差值并择优展示。
@@ -343,22 +345,22 @@ export default function Home() {
           {adapters
             .filter((adapter) => enabledIds.includes(adapter.id))
             .map((adapter) => {
-              const st = statuses[adapter.id]
-              const healthy = st === 'ok' || st === 'open'
+              const st = statuses[adapter.id];
+              const healthy = st === "ok" || st === "open";
               return (
                 <div key={adapter.id} className="flex items-center gap-2">
                   <span
                     aria-hidden
                     className={`status-dot ${
-                      healthy ? 'status-dot--ok' : 'status-dot--error'
+                      healthy ? "status-dot--ok" : "status-dot--error"
                     }`}
                   />
                   <span>
                     {adapter.label}
-                    {st ? `：${st}` : '：无数据'}
+                    {st ? `：${st}` : "：无数据"}
                   </span>
                 </div>
-              )
+              );
             })}
         </div>
       </div>
@@ -404,5 +406,5 @@ export default function Home() {
         }
       `}</style>
     </>
-  )
+  );
 }
