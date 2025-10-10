@@ -1,8 +1,8 @@
-import type { ExchangeAdapter } from './types'
-import { createLighterAdapter } from './lighter'
-import { createEdgeXAdapter } from './edgex'
-import { createBackpackAdapter } from './backpack'
-import { createParadexAdapter } from './paradex'
+import type { ExchangeAdapter } from "./types";
+import { createLighterAdapter } from "./lighter";
+import { createEdgeXAdapter } from "./edgex";
+import { createBackpackAdapter } from "./backpack";
+import { createParadexAdapter } from "./paradex";
 
 export function getDefaultAdapters(): ExchangeAdapter[] {
   return [
@@ -10,5 +10,5 @@ export function getDefaultAdapters(): ExchangeAdapter[] {
     createEdgeXAdapter(),
     createBackpackAdapter(),
     createParadexAdapter(),
-  ]
+  ];
 }
